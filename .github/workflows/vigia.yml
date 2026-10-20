@@ -6,7 +6,12 @@ name: vigia-externa
 on:
   schedule:
     - cron: "*/10 * * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      simular_falha:
+        description: "Teste do caminho de alerta: falha de propósito (só execução manual)"
+        type: boolean
+        default: false
 permissions: {}
 jobs:
   vigiar:
@@ -31,6 +36,9 @@ jobs:
           conferir "loja" "https://cazafilipa.com.br/api/health" 200
           conferir "loja-home" "https://cazafilipa.com.br/" 200
           conferir "painel" "https://admin.cazafilipa.com.br/api/health" 200
+          if [ "${{ inputs.simular_falha }}" = "true" ]; then
+            conferir "TESTE-falha-proposital" "https://cazafilipa.com.br/api/health" 599
+          fi
           conferir "morsystem" "https://api.morsystem.morgadoconsultoria.com/health" 200
           if [ "$falhas" -gt 0 ]; then
             echo "::error::$falhas verificação(ões) falharam de fora da VPS"
