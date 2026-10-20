@@ -1,0 +1,38 @@
+# Vigia EXTERNO da VPS da CAZA FILIPA / MorSystem (auditoria P2-22, 20/10/2026).
+# Roda FORA da VPS (GitHub Actions). Se a VPS, o Docker ou a rede caírem por inteiro, os alertas internos
+# (Prometheus/Alertmanager/ntfy/Uptime Kuma, que moram na VPS) morrem junto — este workflow não.
+# Falha → o GitHub envia e-mail ao dono do repositório. Sem segredos: só URLs públicas.
+name: vigia-externa
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+permissions: {}
+jobs:
+  vigiar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Conferir loja, painel e MorSystem de fora da VPS
+        shell: bash
+        run: |
+          set -u
+          falhas=0
+          conferir() {
+            local nome="$1" url="$2" esperado="$3" codigo=000
+            for tentativa in 1 2 3; do
+              codigo=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$url" || true)
+              [ "$codigo" = "$esperado" ] && break
+              sleep 20
+            done
+            echo "$nome $url -> $codigo (esperado $esperado)"
+            [ "$codigo" = "$esperado" ] || falhas=$((falhas + 1))
+          }
+          conferir "loja" "https://cazafilipa.com.br/api/health" 200
+          conferir "loja-home" "https://cazafilipa.com.br/" 200
+          conferir "painel" "https://admin.cazafilipa.com.br/api/health" 200
+          conferir "morsystem" "https://api.morsystem.morgadoconsultoria.com/health" 200
+          if [ "$falhas" -gt 0 ]; then
+            echo "::error::$falhas verificação(ões) falharam de fora da VPS"
+            exit 1
+          fi
